@@ -182,6 +182,7 @@ type opt struct {
 	stdout       io.Writer     // standard output
 	stderr       io.Writer     // standard error
 	filesystem   fs.FS
+	goCache      string // GOCACHE
 }
 
 // Interpreter contains global resources and state.
@@ -295,6 +296,9 @@ type Options struct {
 	// GoPath sets GOPATH for the interpreter.
 	GoPath string
 
+	// GoCache sets GOCACHE for the interpreter.
+	GoCache string
+
 	// BuildTags sets build constraints for the interpreter.
 	BuildTags []string
 
@@ -313,7 +317,7 @@ type Options struct {
 // New returns a new interpreter.
 func New(options Options) *Interpreter {
 	i := Interpreter{
-		opt:      opt{context: build.Default, filesystem: &realFS{}},
+		opt:      opt{context: build.Default, filesystem: &realFS{}, goCache: options.GoCache},
 		frame:    newFrame(nil, 0, 0),
 		fset:     token.NewFileSet(),
 		universe: initUniverse(),

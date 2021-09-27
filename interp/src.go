@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // importSrc calls gta on the source code for the package identified by
@@ -23,22 +25,14 @@ func (interp *Interpreter) importSrc(rPath, importPath string, skipTest bool) (s
 		return name, nil
 	}
 
-	// For relative import paths in the form "./xxx" or "../xxx", the initial
-	// base path is the directory of the interpreter input file, or "." if no file
-	// was provided.
-	// In all other cases, absolute import paths are resolved from the GOPATH
-	// and the nested "vendor" directories.
+	// resolve relative and absolute import paths
 	if isPathRelative(importPath) {
 		if rPath == mainID {
 			rPath = "."
 		}
 		dir = filepath.Join(filepath.Dir(interp.name), rPath, importPath)
-	} else if dir, rPath, err = interp.pkgDir(interp.context.GOPATH, rPath, importPath); err != nil {
-		// Try again, assuming a root dir at the source location.
-		if rPath, err = interp.rootFromSourceLocation(); err != nil {
-			return "", err
-		}
-		if dir, rPath, err = interp.pkgDir(interp.context.GOPATH, rPath, importPath); err != nil {
+	} else {
+		if dir, err = interp.getPackageDir(importPath); err != nil {
 			return "", err
 		}
 	}
@@ -187,99 +181,35 @@ func (interp *Interpreter) rootFromSourceLocation() (string, error) {
 	return root, nil
 }
 
-// pkgDir returns the absolute path in filesystem for a package given its import path
-// and the root of the subtree dependencies.
-func (interp *Interpreter) pkgDir(goPath string, root, importPath string) (string, string, error) {
-	rPath := filepath.Join(root, "vendor")
-	dir := filepath.Join(goPath, "src", rPath, importPath)
-
-	if _, err := fs.Stat(interp.opt.filesystem, dir); err == nil {
-		return dir, rPath, nil // found!
-	}
-
-	dir = filepath.Join(goPath, "src", effectivePkg(root, importPath))
-
-	if _, err := fs.Stat(interp.opt.filesystem, dir); err == nil {
-		return dir, root, nil // found!
-	}
-
-	if len(root) == 0 {
-		if interp.context.GOPATH == "" {
-			return "", "", fmt.Errorf("unable to find source related to: %q. Either the GOPATH environment variable, or the Interpreter.Options.GoPath needs to be set", importPath)
-		}
-		return "", "", fmt.Errorf("unable to find source related to: %q", importPath)
-	}
-
-	rootPath := filepath.Join(goPath, "src", root)
-	prevRoot, err := previousRoot(interp.opt.filesystem, rootPath, root)
+// getPackageDir uses the GOPATH to find the absolute path of an import path
+func (interp *Interpreter) getPackageDir(importPath string) (string, error) {
+	// search the standard library and Go modules.
+	config := packages.Config{}
+	config.Env = append(config.Env, "GOPATH="+interp.context.GOPATH, "GOCACHE="+interp.opt.goCache)
+	pkgs, err := packages.Load(&config, importPath)
 	if err != nil {
-		return "", "", err
+		return "", fmt.Errorf("An error occurred retrieving a package from the GOPATH: %v\n%v", importPath, err)
 	}
 
-	return interp.pkgDir(goPath, prevRoot, importPath)
-}
-
-const vendor = "vendor"
-
-// Find the previous source root (vendor > vendor > ... > GOPATH).
-func previousRoot(filesystem fs.FS, rootPath, root string) (string, error) {
-	rootPath = filepath.Clean(rootPath)
-	parent, final := filepath.Split(rootPath)
-	parent = filepath.Clean(parent)
-
-	// TODO(mpl): maybe it works for the special case main, but can't be bothered for now.
-	if root != mainID && final != vendor {
-		root = strings.TrimSuffix(root, string(filepath.Separator))
-		prefix := strings.TrimSuffix(strings.TrimSuffix(rootPath, root), string(filepath.Separator))
-
-		// look for the closest vendor in one of our direct ancestors, as it takes priority.
-		var vendored string
-		for {
-			fi, err := fs.Stat(filesystem, filepath.Join(parent, vendor))
-			if err == nil && fi.IsDir() {
-				vendored = strings.TrimPrefix(strings.TrimPrefix(parent, prefix), string(filepath.Separator))
-				break
-			}
-			if !os.IsNotExist(err) {
-				return "", err
-			}
-
-			// stop when we reach GOPATH/src/blah
-			parent = filepath.Dir(parent)
-			if parent == prefix {
-				break
-			}
-
-			// just an additional failsafe, stop if we reach the filesystem root, or dot (if
-			// we are dealing with relative paths).
-			// TODO(mpl): It should probably be a critical error actually,
-			// as we shouldn't have gone that high up in the tree.
-			if parent == string(filepath.Separator) || parent == "." {
-				break
+	// confirm the import path is found.
+	for _, pkg := range pkgs {
+		for _, goFile := range pkg.GoFiles {
+			if strings.Contains(filepath.Dir(goFile), pkg.Name) {
+				return filepath.Dir(goFile), nil
 			}
 		}
-
-		if vendored != "" {
-			return vendored, nil
-		}
 	}
 
-	// TODO(mpl): the algorithm below might be redundant with the one above,
-	// but keeping it for now. Investigate/simplify/remove later.
-	splitRoot := strings.Split(root, string(filepath.Separator))
-	var index int
-	for i := len(splitRoot) - 1; i >= 0; i-- {
-		if splitRoot[i] == "vendor" {
-			index = i
-			break
-		}
+	// certain go tooldirs are in GOTOOLDIR.
+	// filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(toolDir))), "src", )
+	// linux android darwin dragonfly freebsd nacl netbsd openbsd plan9 solaris
+	switch interp.context.GOOS {
+	case "windows":
+		return filepath.Join("C:/Program Files/Go/src", "unsafe"), nil
+	default:
+		return "", fmt.Errorf("You must set the GOTOOLDIR for this operating system.")
 	}
-
-	if index == 0 {
-		return "", nil
-	}
-
-	return filepath.Join(splitRoot[:index]...), nil
+	return "", fmt.Errorf("An import source could not be found: %q. Set the GOPATH environment variable from Interpreter.Options.GoPath.", importPath)
 }
 
 func effectivePkg(root, path string) string {
