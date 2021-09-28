@@ -185,10 +185,10 @@ func (interp *Interpreter) rootFromSourceLocation() (string, error) {
 func (interp *Interpreter) getPackageDir(importPath string) (string, error) {
 	// search the standard library and Go modules.
 	config := packages.Config{}
-	config.Env = append(config.Env, "GOPATH="+interp.context.GOPATH, "GOCACHE="+interp.opt.goCache)
+	config.Env = append(config.Env, "GOPATH="+interp.context.GOPATH, "GOCACHE="+interp.opt.goCache, "GOTOOLDIR="+interp.opt.goToolDir)
 	pkgs, err := packages.Load(&config, importPath)
 	if err != nil {
-		return "", fmt.Errorf("An error occurred retrieving a package from the GOPATH: %v\n%v", importPath, err)
+		return "", fmt.Errorf("An error occurred retrieving a package from the GOPATH: %v\n%v\nIf Acess is denied, run in administrator.", importPath, err)
 	}
 
 	// confirm the import path is found.
@@ -200,16 +200,67 @@ func (interp *Interpreter) getPackageDir(importPath string) (string, error) {
 		}
 	}
 
-	// certain go tooldirs are in GOTOOLDIR.
-	// filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(toolDir))), "src", )
-	// linux android darwin dragonfly freebsd nacl netbsd openbsd plan9 solaris
-	switch interp.context.GOOS {
-	case "windows":
-		return filepath.Join("C:/Program Files/Go/src", "unsafe"), nil
-	default:
-		return "", fmt.Errorf("You must set the GOTOOLDIR for this operating system.")
+	// check for certain go tools located in GOTOOLDIR
+	if interp.opt.goToolDir != "" {
+		// search for the go directory before searching for packages
+		// this approach prevents the computer from searching the entire filesystem
+		godir, err := searchUpDirPath(interp.opt.goToolDir, "go", false)
+		if err != nil {
+			return "", fmt.Errorf("An import source could not be found: %q\nThe current GOPATH=%v, GOCACHE=%v, GOTOOLDIR=%v\n%v", importPath, interp.context.GOPATH, interp.opt.goCache, interp.opt.goToolDir, err)
+		}
+
+		absimportpath, err := searchDirs(godir, importPath)
+		if err != nil {
+			return "", fmt.Errorf("An import source could not be found: %q\nThe current GOPATH=%v, GOCACHE=%v, GOTOOLDIR=%v\n%v", importPath, interp.context.GOPATH, interp.opt.goCache, interp.opt.goToolDir, err)
+		}
+		return absimportpath, nil
 	}
-	return "", fmt.Errorf("An import source could not be found: %q. Set the GOPATH environment variable from Interpreter.Options.GoPath.", importPath)
+	return "", fmt.Errorf("An import source could not be found: %q. Set the GOPATH and/or GOTOOLDIR environment variable from Interpreter.Options.", importPath)
+}
+
+// searchUpDirPath searches up a directory path in order to find a target directory.
+func searchUpDirPath(initial string, target string, isCaseSensitive bool) (string, error) {
+	// strings.Split always returns [:0] as filepath.Dir returns "." or the last directory
+	splitdir := strings.Split(filepath.Join(initial), string(filepath.Separator))
+	if len(splitdir) == 1 {
+		return "", fmt.Errorf("The target directory %q is not within the path %q", target, initial)
+	}
+
+	updir := splitdir[len(splitdir)-1]
+	if !isCaseSensitive {
+		updir = strings.ToLower(updir)
+	}
+	if updir == target {
+		return initial, nil
+	}
+	return searchUpDirPath(filepath.Dir(initial), target, isCaseSensitive)
+}
+
+// searchDirs searches within a directory (and its subdirectories) in an attempt to find a filepath.
+func searchDirs(initial string, target string) (string, error) {
+	absfilepath, err := filepath.Abs(initial)
+	if err != nil {
+		return "", err
+	}
+
+	// find the go directory
+	var foundpath string
+	filter := func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
+			if d.Name() == target {
+				foundpath = path
+			}
+		}
+		return nil
+	}
+	if err = filepath.WalkDir(absfilepath, filter); err != nil {
+		return "", fmt.Errorf("An error occurred searching for a directory.\n%v", err)
+	}
+
+	if foundpath != "" {
+		return foundpath, nil
+	}
+	return "", fmt.Errorf("The target filepath %q is not within the path %q", target, initial)
 }
 
 func effectivePkg(root, path string) string {
