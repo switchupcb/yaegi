@@ -15,6 +15,7 @@ It powers executable Go scripts and plugins, in embedded interpreters or interac
 * Complete support of [Go specification][specs]
 * Written in pure Go, using only the standard library
 * Simple interpreter API: `New()`, `Eval()`, `Use()`
+* Supports Go Modules
 * Works everywhere Go works
 * All Go & runtime resources accessible from script (with control)
 * Security: `unsafe` and `syscall` packages neither used nor exported by default
@@ -94,6 +95,11 @@ func Bar(s string) string { return s + "-Foo" }`
 
 func main() {
 	i := interp.New(interp.Options{})
+
+	// import the standard library (Go Modules)
+	if err := i.Use(stdlib.Symbols); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := i.Eval(src)
 	if err != nil {
