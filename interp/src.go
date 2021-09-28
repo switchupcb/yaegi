@@ -10,7 +10,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// importSrc calls gta on the source code for the package identified by
+// importSrc calls global tag analysis on the source code for the package identified by
 // importPath. rPath is the relative path to the directory containing the source
 // code for the package. It can also be "main" as a special value.
 func (interp *Interpreter) importSrc(rPath, importPath string, skipTest bool) (string, error) {
