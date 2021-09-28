@@ -188,7 +188,7 @@ func (interp *Interpreter) getPackageDir(importPath string) (string, error) {
 	config.Env = append(config.Env, "GOPATH="+interp.context.GOPATH, "GOCACHE="+interp.opt.goCache, "GOTOOLDIR="+interp.opt.goToolDir)
 	pkgs, err := packages.Load(&config, importPath)
 	if err != nil {
-		return "", fmt.Errorf("An error occurred retrieving a package from the GOPATH: %v\n%v\nIf Acess is denied, run in administrator.", importPath, err)
+		return "", fmt.Errorf("An error occurred retrieving a package from the GOPATH: %v\n%v\nIf Access is denied, run in administrator.", importPath, err)
 	}
 
 	// confirm the import path is found.
