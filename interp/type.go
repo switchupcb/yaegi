@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/traefik/yaegi/internal/unsafe2"
+	"github.com/switchupcb/yaegi/internal/unsafe2"
 )
 
 // tcat defines interpreter type categories.

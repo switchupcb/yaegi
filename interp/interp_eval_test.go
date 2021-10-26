@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/traefik/yaegi/interp"
-	"github.com/traefik/yaegi/stdlib"
+	"github.com/switchupcb/yaegi/interp"
+	"github.com/switchupcb/yaegi/stdlib"
 )
 
 func init() { log.SetFlags(log.Lshortfile) }

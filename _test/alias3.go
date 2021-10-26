@@ -1,6 +1,6 @@
 package main
 
-import "github.com/traefik/yaegi/_test/alias3"
+import "github.com/switchupcb/yaegi/_test/alias3"
 
 var globalT *T
 

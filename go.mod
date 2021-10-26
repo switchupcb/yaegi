@@ -1,4 +1,4 @@
-module github.com/traefik/yaegi
+module github.com/switchupcb/yaegi
 
 go 1.16
 

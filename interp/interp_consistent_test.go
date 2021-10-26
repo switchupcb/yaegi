@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/traefik/yaegi/interp"
-	"github.com/traefik/yaegi/stdlib"
-	"github.com/traefik/yaegi/stdlib/unsafe"
+	"github.com/switchupcb/yaegi/interp"
+	"github.com/switchupcb/yaegi/stdlib"
+	"github.com/switchupcb/yaegi/stdlib/unsafe"
 )
 
 func TestInterpConsistencyBuild(t *testing.T) {

@@ -72,7 +72,7 @@ jobs:
     needs: linting
     defaults:
       run:
-        working-directory: ${{ github.workspace }}/go/src/github.com/traefik/yaegi
+        working-directory: ${{ github.workspace }}/go/src/github.com/switchupcb/yaegi
     strategy:
       matrix:
         go-version: [ 1.16, 1.17 ]
@@ -86,7 +86,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          path: go/src/github.com/traefik/yaegi
+          path: go/src/github.com/switchupcb/yaegi
           fetch-depth: 0
 
       # https://github.com/marketplace/actions/cache

@@ -6,7 +6,7 @@ import (
 	"go/token"
 	"testing"
 
-	"github.com/traefik/yaegi/stdlib"
+	"github.com/switchupcb/yaegi/stdlib"
 )
 
 func TestCompileAST(t *testing.T) {
