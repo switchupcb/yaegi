@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"go/format"
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 	"text/template"
 )
@@ -557,7 +557,7 @@ func {{$name}}(n *node) {
 				fnext := getExec(n.fnext)
 				n.exec = func(f *frame) bltn {
 					i1 := v1(f).Interface()
-					if i0 != i1 {
+					if i0 {{$op.Name}} i1 {
 						dest(f).SetBool(true)
 						return tnext
 					}
@@ -579,7 +579,7 @@ func {{$name}}(n *node) {
 				fnext := getExec(n.fnext)
 				n.exec = func(f *frame) bltn {
 					i0 := v0(f).Interface()
-					if i0 != i1 {
+					if i0 {{$op.Name}} i1 {
 						dest(f).SetBool(true)
 						return tnext
 					}
@@ -602,7 +602,7 @@ func {{$name}}(n *node) {
 				n.exec = func(f *frame) bltn {
 					i0 := v0(f).Interface()
 					i1 := v1(f).Interface()
-					if i0 != i1 {
+					if i0 {{$op.Name}} i1 {
 						dest(f).SetBool(true)
 						return tnext
 					}
@@ -1183,7 +1183,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err = ioutil.WriteFile("op.go", source, 0o666); err != nil {
+	if err = os.WriteFile("op.go", source, 0o666); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -3,34 +3,35 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 )
 
+func mock(name string) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		fmt.Fprint(rw, "Hello ", name)
+	}
+}
+
 func client(uri string) {
 	resp, err := http.Get(uri)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	fmt.Println(string(body))
 }
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Welcome to my website!")
-	})
-
 	server := httptest.NewServer(mux)
 	defer server.Close()
-
+	mux.Handle("/", mock("foo"))
 	client(server.URL)
 }
 
 // Output:
-// Welcome to my website!
+// Hello foo
