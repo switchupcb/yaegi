@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strconv"
@@ -47,7 +46,12 @@ func run(arg []string) error {
 	}
 	args := rflag.Args()
 
-	i := interp.New(interp.Options{GoPath: build.Default.GOPATH, BuildTags: strings.Split(tags, ",")})
+	i := interp.New(interp.Options{
+		GoPath:       build.Default.GOPATH,
+		BuildTags:    strings.Split(tags, ","),
+		Env:          os.Environ(),
+		Unrestricted: useUnrestricted,
+	})
 	if err := i.Use(stdlib.Symbols); err != nil {
 		return err
 	}
@@ -130,7 +134,7 @@ func isFile(path string) bool {
 }
 
 func runFile(i *interp.Interpreter, path string, noAutoImport bool) error {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}

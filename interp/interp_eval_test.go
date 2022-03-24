@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -418,6 +417,8 @@ func TestEvalComparison(t *testing.T) {
 		{src: `2 > 1`, res: "true"},
 		{src: `1.2 > 1.1`, res: "true"},
 		{src: `"hhh" > "ggg"`, res: "true"},
+		{src: `a, b, c := 1, 1, false; if a == b { c = true }; c`, res: "true"},
+		{src: `a, b, c := 1, 2, false; if a != b { c = true }; c`, res: "true"},
 		{
 			desc: "mismatched types",
 			src: `
@@ -883,7 +884,7 @@ func TestMultiEval(t *testing.T) {
 	if err = w.Close(); err != nil {
 		t.Fatal(err)
 	}
-	outInterp, err := ioutil.ReadAll(r)
+	outInterp, err := io.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -914,7 +915,7 @@ func TestMultiEvalNoName(t *testing.T) {
 		t.Fatal(err)
 	}
 	for k, v := range names {
-		data, err := ioutil.ReadFile(filepath.Join(f.Name(), v))
+		data, err := os.ReadFile(filepath.Join(f.Name(), v))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1723,4 +1724,28 @@ func TestPassArgs(t *testing.T) {
 	runTests(t, i, []testCase{
 		{src: "os.Args", res: "[arg0 arg1]"},
 	})
+}
+
+func TestRestrictedEnv(t *testing.T) {
+	i := interp.New(interp.Options{Env: []string{"foo=bar"}})
+	if err := i.Use(stdlib.Symbols); err != nil {
+		t.Fatal(err)
+	}
+	i.ImportUsed()
+	runTests(t, i, []testCase{
+		{src: `os.Getenv("foo")`, res: "bar"},
+		{src: `s, ok := os.LookupEnv("foo"); s`, res: "bar"},
+		{src: `s, ok := os.LookupEnv("foo"); ok`, res: "true"},
+		{src: `s, ok := os.LookupEnv("PATH"); s`, res: ""},
+		{src: `s, ok := os.LookupEnv("PATH"); ok`, res: "false"},
+		{src: `os.Setenv("foo", "baz"); os.Environ()`, res: "[foo=baz]"},
+		{src: `os.ExpandEnv("foo is ${foo}")`, res: "foo is baz"},
+		{src: `os.Unsetenv("foo"); os.Environ()`, res: "[]"},
+		{src: `os.Setenv("foo", "baz"); os.Environ()`, res: "[foo=baz]"},
+		{src: `os.Clearenv(); os.Environ()`, res: "[]"},
+		{src: `os.Setenv("foo", "baz"); os.Environ()`, res: "[foo=baz]"},
+	})
+	if s, ok := os.LookupEnv("foo"); ok {
+		t.Fatal("expected \"\", got " + s)
+	}
 }

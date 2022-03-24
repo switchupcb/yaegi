@@ -64,6 +64,9 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 		if err != nil {
 			return false
 		}
+		if n.scope == nil {
+			n.scope = sc
+		}
 		switch n.kind {
 		case binaryExpr, unaryExpr, parenExpr:
 			if isBoolAction(n) {
@@ -412,11 +415,11 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			sc.loop = n
 
 		case importSpec:
-			// already all done in gta
+			// Already all done in GTA.
 			return false
 
 		case typeSpec:
-			// processing already done in GTA pass for global types, only parses inlined types
+			// Processing already done in GTA pass for global types, only parses inlined types.
 			if sc.def == nil {
 				return false
 			}
@@ -426,8 +429,11 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				return false
 			}
 			if typ.incomplete {
-				err = n.cfgErrorf("invalid type declaration")
-				return false
+				// Type may still be incomplete in case of a local recursive struct declaration.
+				if typ, err = typ.finalize(); err != nil {
+					err = n.cfgErrorf("invalid type declaration")
+					return false
+				}
 			}
 
 			switch n.child[1].kind {
@@ -596,8 +602,8 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						// Skip optimisation for assigned interface.
 						break
 					}
-					if dest.action == aGetIndex {
-						// Skip optimization, as it does not work when assigning to a struct field.
+					if dest.action == aGetIndex || dest.action == aStar {
+						// Skip optimization, as it does not work when assigning to a struct field or a dereferenced pointer.
 						break
 					}
 					n.gen = nop
@@ -659,7 +665,12 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				if r := lc.child[0].typ.numOut(); r != l {
 					err = n.cfgErrorf("assignment mismatch: %d variables but %s returns %d values", l, lc.child[0].name(), r)
 				}
-				n.gen = nop
+				if isBinCall(lc, sc) {
+					n.gen = nop
+				} else {
+					// TODO (marc): skip if no conversion or wrapping is needed.
+					n.gen = assignFromCall
+				}
 			case indexExpr:
 				lc.gen = getIndexMap2
 				n.gen = nop
@@ -967,7 +978,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					n.typ = c0.typ
 					n.findex = sc.add(n.typ)
 				}
-			case isBinCall(n):
+			case isBinCall(n, sc):
 				err = check.arguments(n, n.child[1:], n.child[0], n.action == aCallSlice)
 				if err != nil {
 					break
@@ -2010,13 +2021,18 @@ func compDefineX(sc *scope, n *node) error {
 		} else {
 			types = funtype.ret
 		}
-		if n.child[l-1].isType(sc) {
+		if n.anc.kind == varDecl && n.child[l-1].isType(sc) {
 			l--
 		}
 		if len(types) != l {
 			return n.cfgErrorf("assignment mismatch: %d variables but %s returns %d values", l, src.child[0].name(), len(types))
 		}
-		n.gen = nop
+		if isBinCall(src, sc) {
+			n.gen = nop
+		} else {
+			// TODO (marc): skip if no conversion or wrapping is needed.
+			n.gen = assignFromCall
+		}
 
 	case indexExpr:
 		types = append(types, src.typ, sc.getType("bool"))
@@ -2465,8 +2481,19 @@ func isCall(n *node) bool {
 	return n.action == aCall || n.action == aCallSlice
 }
 
-func isBinCall(n *node) bool {
-	return isCall(n) && n.child[0].typ.cat == valueT && n.child[0].typ.rtype.Kind() == reflect.Func
+func isBinCall(n *node, sc *scope) bool {
+	if !isCall(n) || len(n.child) == 0 {
+		return false
+	}
+	c0 := n.child[0]
+	if c0.typ == nil {
+		// If called early in parsing, child type may not be known yet.
+		c0.typ, _ = nodeType(n.interp, sc, c0)
+		if c0.typ == nil {
+			return false
+		}
+	}
+	return c0.typ.cat == valueT && c0.typ.rtype.Kind() == reflect.Func
 }
 
 func isOffsetof(n *node) bool {

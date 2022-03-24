@@ -185,7 +185,7 @@ func (interp *Interpreter) rootFromSourceLocation() (string, error) {
 func (interp *Interpreter) getPackageDir(importPath string) (string, error) {
 	// search the standard library and Go modules.
 	config := packages.Config{}
-	config.Env = append(config.Env, "GOPATH="+interp.context.GOPATH, "GOCACHE="+interp.opt.goCache, "GOTOOLDIR="+interp.opt.goToolDir)
+	config.Env = append(config.Env, "GOPATH="+interp.context.GOPATH, "GOCACHE="+interp.opt.env["goCache"], "GOTOOLDIR="+interp.opt.env["goToolDir"])
 	pkgs, err := packages.Load(&config, importPath)
 	if err != nil {
 		return "", fmt.Errorf("An error occurred retrieving a package from the GOPATH: %v\n%v\nIf Access is denied, run in administrator.", importPath, err)
@@ -201,17 +201,17 @@ func (interp *Interpreter) getPackageDir(importPath string) (string, error) {
 	}
 
 	// check for certain go tools located in GOTOOLDIR
-	if interp.opt.goToolDir != "" {
+	if interp.opt.env["goToolDir"] != "" {
 		// search for the go directory before searching for packages
 		// this approach prevents the computer from searching the entire filesystem
-		godir, err := searchUpDirPath(interp.opt.goToolDir, "go", false)
+		godir, err := searchUpDirPath(interp.opt.env["goToolDir"], "go", false)
 		if err != nil {
-			return "", fmt.Errorf("An import source could not be found: %q\nThe current GOPATH=%v, GOCACHE=%v, GOTOOLDIR=%v\n%v", importPath, interp.context.GOPATH, interp.opt.goCache, interp.opt.goToolDir, err)
+			return "", fmt.Errorf("An import source could not be found: %q\nThe current GOPATH=%v, GOCACHE=%v, GOTOOLDIR=%v\n%v", importPath, interp.context.GOPATH, interp.opt.env["goCache"], interp.opt.env["goToolDir"], err)
 		}
 
 		absimportpath, err := searchDirs(godir, importPath)
 		if err != nil {
-			return "", fmt.Errorf("An import source could not be found: %q\nThe current GOPATH=%v, GOCACHE=%v, GOTOOLDIR=%v\n%v", importPath, interp.context.GOPATH, interp.opt.goCache, interp.opt.goToolDir, err)
+			return "", fmt.Errorf("An import source could not be found: %q\nThe current GOPATH=%v, GOCACHE=%v, GOTOOLDIR=%v\n%v", importPath, interp.context.GOPATH, interp.opt.env["goCache"], interp.opt.env["goToolDir"], err)
 		}
 		return absimportpath, nil
 	}
