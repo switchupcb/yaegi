@@ -333,10 +333,11 @@ type Options struct {
 // New returns a new interpreter.
 func New(options Options) *Interpreter {
 	i := Interpreter{
-		opt: opt{context: build.Default, filesystem: &realFS{}, env: map[string]string{
-			"goCache":   options.GoCache,
-			"goToolDir": options.GoToolDir,
-			}
+		opt: opt{
+			context: build.Default, filesystem: &realFS{}, env: map[string]string{
+				"goCache":   options.GoCache,
+				"goToolDir": options.GoToolDir,
+			},
 		},
 		frame:    newFrame(nil, 0, 0),
 		fset:     token.NewFileSet(),
