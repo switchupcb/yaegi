@@ -183,8 +183,6 @@ type opt struct {
 	filesystem   fs.FS             // filesystem containing sources
 	astDot       bool              // display AST graph (debug)
 	cfgDot       bool              // display CFG graph (debug)
-	noRun        bool              // compile, but do not run
-	fastChan     bool              // disable cancellable chan operations
 	specialStdio bool              // allows os.Stdin, os.Stdout, os.Stderr to not be file descriptors
 	unrestricted bool              // allow use of non sandboxed symbols
 }
